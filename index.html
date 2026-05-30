@@ -5,6 +5,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>STOP — Credenciamento para Dentistas (Infoproduto)</title>
 
+<!-- Meta (Facebook) Pixel -->
+<script>
+  !function(f,b,e,v,n,t,s)
+  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+  n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];
+  s.parentNode.insertBefore(t,s)}(window, document,'script',
+  'https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init', '219997332003928');
+  fbq('track', 'PageView');
+
+  // Eventos de conversão por clique (delegação — funciona com botões gerados via script)
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('a');
+    if (!a || !a.href) return;
+    if (a.href.indexOf('pay.kiwify.com.br') !== -1) {
+      fbq('track', 'InitiateCheckout');
+    } else if (a.href.indexOf('wa.me') !== -1) {
+      fbq('track', 'Lead');
+    }
+  });
+</script>
+<noscript><img height="1" width="1" style="display:none"
+  src="https://www.facebook.com/tr?id=219997332003928&ev=PageView&noscript=1" alt="" /></noscript>
+<!-- End Meta Pixel -->
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -218,7 +246,7 @@
   .hero.dark {
     background: var(--navy);
     color: #fff;
-    padding: 70px 0 90px;
+    padding: 40px 0 80px;
     position: relative;
     overflow: hidden;
   }
@@ -1950,7 +1978,7 @@ const HEADLINES_V2 = {
   C: {
     eyebrow: <span style={{color: 'rgb(63, 182, 255)'}}>Mais de 800 dentistas já fazem parte</span>,
     pre: "Eles pararam de correr atrás de pacientes.",
-    bold: <>Criaram uma <span className="hl">carteira que volta todo mês.</span> Você pode fazer o mesmo.</>,
+    bold: <>Criaram uma <span className="hl">renda que entra todo mês.</span> Você pode fazer o mesmo.</>,
   },
 };
 
@@ -2002,7 +2030,7 @@ function HeroV2({ variant = "A" }) {
       <div className="wrap hero-inner">
         <div className="eyebrow">{h.eyebrow}</div>
 
-        <h1 className="display display-xl hero-h1" style={{marginTop: 22}}>
+        <h1 className="display display-xl hero-h1" style={{marginTop: 16}}>
           <div style={{color: 'rgba(255,255,255,.78)', fontWeight: 400, fontSize: '0.55em', letterSpacing: '-0.01em', marginBottom: 14, fontFamily: 'var(--font-sans)'}}>
             {h.pre}
           </div>
