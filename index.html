@@ -2654,18 +2654,7 @@ function PreRegModal() {
     window.location.href = checkoutUrl;
   }
 
-  function submitToActiveCampaign(done) {
-    // Envia para o proc.php do ActiveCampaign pelo MESMO método que o script oficial
-    // do AC usa: uma requisição GET via <script> com jsonp=true. É o mais confiável.
-    if (!AC_CONFIG.action) { if (done) done(); return; }
-
-    // stubs para a resposta jsonp do AC não quebrar
-    window._show_thank_you = window._show_thank_you || function(){};
-    window._show_error = window._show_error || function(){};
-    window._show_unsubscribe = window._show_unsubscribe || function(){};
-    window._show_pc_confirmation = window._show_pc_confirmation || function(){};
-    window._load_script = window._load_script || function(u, cb){ var s=document.createElement('script'); s.src=u; if(cb) s.onload=cb; document.head.appendChild(s); };
-
+  function buildACUrl() {
     var params = [];
     var add = function(k, v){ params.push(encodeURIComponent(k) + '=' + encodeURIComponent(v)); };
     add('u', AC_CONFIG.u);
@@ -2675,19 +2664,43 @@ function PreRegModal() {
     if (AC_CONFIG.or) add('or', AC_CONFIG.or);
     add(AC_CONFIG.nameField, values.name.trim());
     add(AC_CONFIG.emailField, values.email.trim());
-    add(AC_CONFIG.phoneField, '+55 ' + formatPhone(values.phone));
+    // E.164 (ex.: +5567996482087) — formato que o ActiveCampaign espera
+    add(AC_CONFIG.phoneField, '+55' + digits(values.phone));
     add('jsonp', 'true');
+    return AC_CONFIG.action + '?' + params.join('&');
+  }
 
-    var s = document.createElement('script');
-    s.charset = 'utf-8';
-    s.src = AC_CONFIG.action + '?' + params.join('&');
-    var called = false;
-    var finish = function(){ if (called) return; called = true; if (done) done(); };
-    s.onload = finish;
-    s.onerror = finish;
-    document.head.appendChild(s);
-    // garante o avanço mesmo se onload demorar
-    setTimeout(finish, 1200);
+  function submitToActiveCampaign(done) {
+    if (!AC_CONFIG.action) { if (done) done(); return; }
+    var url = buildACUrl();
+    var finished = false;
+    var finish = function(){ if (finished) return; finished = true; if (done) done(); };
+
+    // Método principal: fetch com keepalive — a requisição COMPLETA mesmo que
+    // a página redirecione logo em seguida (resolve o lead não chegando).
+    try {
+      if (window.fetch) {
+        fetch(url, { method: 'GET', mode: 'no-cors', keepalive: true })
+          .then(function(){ finish(); })
+          .catch(function(){ /* segue para o fallback abaixo */ });
+      }
+    } catch (e) {}
+
+    // Fallback redundante: tag <script> jsonp (caso fetch/keepalive falhe)
+    try {
+      window._show_thank_you = window._show_thank_you || function(){};
+      window._show_error = window._show_error || function(){};
+      window._show_unsubscribe = window._show_unsubscribe || function(){};
+      window._show_pc_confirmation = window._show_pc_confirmation || function(){};
+      window._load_script = window._load_script || function(u, cb){ var s=document.createElement('script'); s.src=u; if(cb) s.onload=cb; document.head.appendChild(s); };
+      var s = document.createElement('script');
+      s.charset = 'utf-8';
+      s.src = url;
+      document.head.appendChild(s);
+    } catch (e) {}
+
+    // garante o avanço ao checkout mesmo que tudo demore
+    setTimeout(finish, 900);
     return true;
   }
 
