@@ -2654,20 +2654,20 @@ function PreRegModal() {
     window.location.href = checkoutUrl;
   }
 
-  function submitToActiveCampaign() {
-    // Envia via POST para o proc.php do ActiveCampaign usando um iframe oculto
-    // (evita problemas de CORS). Se a config não estiver preenchida, apenas segue ao checkout.
-    if (!AC_CONFIG.action) return false;
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = AC_CONFIG.action;
-    form.target = 'ac_prereg_iframe';
-    form.style.display = 'none';
-    const add = (name, value) => {
-      const i = document.createElement('input');
-      i.type = 'hidden'; i.name = name; i.value = value;
-      form.appendChild(i);
-    };
+  function submitToActiveCampaign(done) {
+    // Envia para o proc.php do ActiveCampaign pelo MESMO método que o script oficial
+    // do AC usa: uma requisição GET via <script> com jsonp=true. É o mais confiável.
+    if (!AC_CONFIG.action) { if (done) done(); return; }
+
+    // stubs para a resposta jsonp do AC não quebrar
+    window._show_thank_you = window._show_thank_you || function(){};
+    window._show_error = window._show_error || function(){};
+    window._show_unsubscribe = window._show_unsubscribe || function(){};
+    window._show_pc_confirmation = window._show_pc_confirmation || function(){};
+    window._load_script = window._load_script || function(u, cb){ var s=document.createElement('script'); s.src=u; if(cb) s.onload=cb; document.head.appendChild(s); };
+
+    var params = [];
+    var add = function(k, v){ params.push(encodeURIComponent(k) + '=' + encodeURIComponent(v)); };
     add('u', AC_CONFIG.u);
     add('f', AC_CONFIG.f);
     add('s', '');
@@ -2676,9 +2676,18 @@ function PreRegModal() {
     add(AC_CONFIG.nameField, values.name.trim());
     add(AC_CONFIG.emailField, values.email.trim());
     add(AC_CONFIG.phoneField, '+55 ' + formatPhone(values.phone));
-    document.body.appendChild(form);
-    form.submit();
-    setTimeout(() => form.remove(), 1500);
+    add('jsonp', 'true');
+
+    var s = document.createElement('script');
+    s.charset = 'utf-8';
+    s.src = AC_CONFIG.action + '?' + params.join('&');
+    var called = false;
+    var finish = function(){ if (called) return; called = true; if (done) done(); };
+    s.onload = finish;
+    s.onerror = finish;
+    document.head.appendChild(s);
+    // garante o avanço mesmo se onload demorar
+    setTimeout(finish, 1200);
     return true;
   }
 
@@ -2693,10 +2702,10 @@ function PreRegModal() {
       if (window.fbq) { window.fbq('track', 'Lead'); window.fbq('track', 'InitiateCheckout'); }
     } catch (err) {}
 
-    submitToActiveCampaign();
+    submitToActiveCampaign(goToCheckout);
 
-    // pequeno atraso para garantir o envio e então redireciona ao checkout
-    setTimeout(goToCheckout, 700);
+    // segurança: se algo travar, redireciona mesmo assim
+    setTimeout(goToCheckout, 2000);
   }
 
   function setField(k, v) {
