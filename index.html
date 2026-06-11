@@ -3080,6 +3080,14 @@ function PreRegModal() {
         if (row) row.style.display = 'none';
       });
 
+      // 2b) Remove a bandeira/"+55" do telefone — deixa o campo limpo.
+      // (o país continua Brasil internamente, então o número é enviado com +55)
+      form.querySelectorAll('.iti__flag-container, .iti__country-container, .selected-flag, .iti-flag, .flag-container, .iti__selected-dial-code, .selected-dial-code')
+        .forEach((el) => { el.style.setProperty('display', 'none', 'important'); });
+      form.querySelectorAll('input[type="tel"]').forEach((tel) => {
+        tel.style.setProperty('padding-left', '14px', 'important');
+      });
+
       // 3) Botão de envio na identidade STOP (vence o estilo inline do AC)
       const btn = form.querySelector('button[type="submit"], ._submit, input[type="submit"]');
       if (btn && btn.dataset.stopStyled !== '1') {
