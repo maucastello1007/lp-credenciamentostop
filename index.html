@@ -1457,10 +1457,22 @@
   .prereg-body ._form_15 .iti { display: block !important; width: 100% !important; position: relative !important; }
   .prereg-body ._form_15 .iti input[type="tel"],
   .prereg-body ._form_15 .iti input[type="text"] {
-    padding-left: 52px !important;
+    padding-left: 58px !important;
   }
+  /* modo "código separado": precisa de mais espaço (bandeira + +55) */
+  .prereg-body ._form_15 .iti--separate-dial-code input[type="tel"],
+  .prereg-body ._form_15 .iti--separate-dial-code input[type="text"] {
+    padding-left: 92px !important;
+  }
+  .prereg-body ._form_15 .iti--separate-dial-code .iti__selected-dial-code { margin-left: 6px !important; color: var(--ink) !important; font-size: 15px !important; }
   .prereg-body ._form_15 .iti__flag-container { z-index: 3 !important; }
-  .prereg-body ._form_15 .iti__selected-flag { padding: 0 8px 0 12px !important; border-radius: 11px 0 0 11px !important; }
+  .prereg-body ._form_15 .iti__selected-flag { padding: 0 8px 0 12px !important; border-radius: 11px 0 0 11px !important; background: transparent !important; }
+  /* fallback p/ versões antigas do intl-tel (classes sem o prefixo iti__) */
+  .prereg-body ._form_15 .intl-tel-input { display: block !important; width: 100% !important; position: relative !important; }
+  .prereg-body ._form_15 .intl-tel-input.separate-dial-code input[type="tel"],
+  .prereg-body ._form_15 .intl-tel-input.separate-dial-code input[type="text"] { padding-left: 92px !important; }
+  .prereg-body ._form_15 .intl-tel-input .selected-dial-code { margin-left: 6px !important; color: var(--ink) !important; }
+  .prereg-body ._form_15 .iti--allow-dropdown input[type="tel"] { padding-left: 92px !important; }
   .prereg-body ._form_15 ._checkbox-radio label,
   .prereg-body ._form_15 ._row._checkbox-radio label { font-weight: 500 !important; font-size: 12px !important; color: var(--ink-soft) !important; line-height: 1.45 !important; }
   .prereg-body ._form_15 ._row { margin-bottom: 12px !important; }
