@@ -1453,7 +1453,14 @@
     border-color: var(--blue-2) !important;
     box-shadow: 0 0 0 3px rgba(31,122,184,.14) !important;
   }
-  .prereg-body ._form_15 .iti { width: 100% !important; }
+  /* telefone com seletor de país (intl-tel-input) — deixa o widget respirar */
+  .prereg-body ._form_15 .iti { display: block !important; width: 100% !important; position: relative !important; }
+  .prereg-body ._form_15 .iti input[type="tel"],
+  .prereg-body ._form_15 .iti input[type="text"] {
+    padding-left: 52px !important;
+  }
+  .prereg-body ._form_15 .iti__flag-container { z-index: 3 !important; }
+  .prereg-body ._form_15 .iti__selected-flag { padding: 0 8px 0 12px !important; border-radius: 11px 0 0 11px !important; }
   .prereg-body ._form_15 ._checkbox-radio label,
   .prereg-body ._form_15 ._row._checkbox-radio label { font-weight: 500 !important; font-size: 12px !important; color: var(--ink-soft) !important; line-height: 1.45 !important; }
   .prereg-body ._form_15 ._row { margin-bottom: 12px !important; }
@@ -2992,20 +2999,20 @@ Object.assign(window, { Magnifier, WorldMapV2, FinderV2, PostsV2 });
 
 </script>
 <script type="text/babel">
-// Pré-inscrição — UI bonita e própria (Nome, WhatsApp, E-mail) + ponte invisível
-// para o formulário REAL do ActiveCampaign (form 15), que faz o envio de verdade.
-// O usuário vê nosso formulário limpo; o AC recebe os dados e dispara lista+automação.
+// Pré-inscrição — usa o formulário REAL do ActiveCampaign (form 15), que comprovadamente
+// entrega na lista + automação. Aqui ele é EMBUTIDO no modal e "embelezado":
+// esconde título/branding do AC, esconde e auto-marca o checkbox de consentimento,
+// arruma o campo de telefone e estiliza o botão. Ao detectar o "obrigado", dispara
+// o Pixel e redireciona ao checkout.
 
 const AC_EMBED_SRC = "https://stopacademy24890.activehosted.com/f/embed.php?id=15";
 let acScriptRequested = false;
 
 function PreRegModal() {
   const [open, setOpen] = React.useState(false);
-  const [sending, setSending] = React.useState(false);
-  const [values, setValues] = React.useState({ name: "", phone: "", email: "" });
-  const [errors, setErrors] = React.useState({});
   const checkoutRef = React.useRef("");
-  const acHostRef = React.useRef(null);
+  const bodyRef = React.useRef(null);
+  const observerRef = React.useRef(null);
   const redirectedRef = React.useRef(false);
 
   // Intercepta cliques nos botões de checkout (Kiwify)
@@ -3018,8 +3025,6 @@ function PreRegModal() {
         e.stopPropagation();
         checkoutRef.current = a.href;
         redirectedRef.current = false;
-        setErrors({});
-        setSending(false);
         setOpen(true);
       }
     }
@@ -3027,7 +3032,7 @@ function PreRegModal() {
     return () => document.removeEventListener('click', onClick, true);
   }, []);
 
-  // Carrega o script do formulário do AC UMA vez (fica oculto, só pra enviar)
+  // Carrega o script do formulário do AC UMA vez
   React.useEffect(() => {
     if (acScriptRequested) return;
     acScriptRequested = true;
@@ -3037,146 +3042,100 @@ function PreRegModal() {
     document.body.appendChild(s);
   }, []);
 
-  // ESC + trava scroll
-  React.useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-      const onKey = (e) => { if (e.key === 'Escape') close(); };
-      window.addEventListener('keydown', onKey);
-      return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', onKey); };
-    }
-  }, [open]);
-
-  function close() { if (!sending) setOpen(false); }
-  function digits(s) { return (s || '').replace(/\D/g, ''); }
-  function formatPhone(v) {
-    const d = digits(v).slice(0, 11);
-    if (d.length <= 2) return d;
-    if (d.length <= 6) return `(${d.slice(0,2)}) ${d.slice(2)}`;
-    if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
-    return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
-  }
-  function validate() {
-    const e = {};
-    if (values.name.trim().length < 2) e.name = "Digite seu nome completo.";
-    if (digits(values.phone).length < 10) e.phone = "Digite um WhatsApp válido com DDD.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) e.email = "Digite um e-mail válido.";
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  }
-
-  function setNativeValue(el, value) {
-    const proto = Object.getPrototypeOf(el);
-    const desc = Object.getOwnPropertyDescriptor(proto, 'value');
-    if (desc && desc.set) desc.set.call(el, value); else el.value = value;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-    el.dispatchEvent(new Event('keyup', { bubbles: true }));
-    el.dispatchEvent(new Event('blur', { bubbles: true }));
-  }
-
   function goToCheckout() {
     if (redirectedRef.current) return;
     redirectedRef.current = true;
     if (checkoutRef.current) window.location.href = checkoutRef.current;
   }
 
-  function submitViaAC() {
-    const host = acHostRef.current;
-    const form = host && host.querySelector('form');
-    if (!form) return false;
+  // Embeleza o formulário do AC assim que ele aparece + observa o sucesso
+  React.useEffect(() => {
+    const container = bodyRef.current;
+    if (!container || observerRef.current) return;
 
-    // preenche os campos reais do AC
-    const nameInput  = form.querySelector('input[name="fullname"], input[name="firstname"], input[id*="fullname"]');
-    const emailInput = form.querySelector('input[name="email"], input[type="email"]');
-    const phoneInput = form.querySelector('input[name="phone"], input[type="tel"]');
-    if (nameInput)  setNativeValue(nameInput, values.name.trim());
-    if (emailInput) setNativeValue(emailInput, values.email.trim());
-    if (phoneInput) setNativeValue(phoneInput, '+55 ' + formatPhone(values.phone));
+    function beautify() {
+      const form = container.querySelector('form');
+      if (!form) return;
 
-    // marca automaticamente qualquer consentimento obrigatório (SMS/marketing)
-    form.querySelectorAll('input[type="checkbox"]').forEach((c) => {
-      if (!c.checked) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); }
-    });
+      // 1) Esconde título/branding/descrições do AC
+      container.querySelectorAll('._form-title, ._form-branding, ._form_element_title, ._html-code')
+        .forEach((el) => { el.style.display = 'none'; });
 
-    // observa o sucesso (bloco de "obrigado" do AC) → redireciona
-    const obs = new MutationObserver(() => {
-      const ty = host.querySelector('._form-thank-you, .form-thank-you, ._form-success');
+      // 2) Checkbox de consentimento (SMS/marketing): marca e esconde a linha
+      form.querySelectorAll('input[type="checkbox"]').forEach((c) => {
+        if (!c.checked) { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); }
+        const row = c.closest('._row, ._form_element, ._checkbox-radio');
+        if (row) row.style.display = 'none';
+      });
+
+      // 3) Botão de envio na identidade STOP (vence o estilo inline do AC)
+      const btn = form.querySelector('button[type="submit"], ._submit, input[type="submit"]');
+      if (btn && btn.dataset.stopStyled !== '1') {
+        btn.dataset.stopStyled = '1';
+        const set = (k, v) => btn.style.setProperty(k, v, 'important');
+        set('background', '#3FB6FF'); set('background-color', '#3FB6FF'); set('background-image', 'none');
+        set('color', '#0A1530'); set('border', 'none'); set('border-radius', '12px');
+        set('font-weight', '800'); set('text-transform', 'uppercase'); set('letter-spacing', '.01em');
+        set('box-shadow', '0 4px 0 #1F7AB8'); set('width', '100%'); set('padding', '16px 24px');
+        set('height', 'auto'); set('cursor', 'pointer'); set('font-size', '15.5px');
+        if (btn.value) btn.value = 'CONTINUAR PARA O CHECKOUT';
+        if (!/checkout/i.test(btn.textContent || '')) {
+          try { btn.textContent = 'CONTINUAR PARA O CHECKOUT'; } catch (e) {}
+        }
+      }
+    }
+
+    function checkSuccess() {
+      beautify();
+      const ty = container.querySelector('._form-thank-you, .form-thank-you, ._form-success');
       const visible = ty && (ty.offsetParent !== null || (ty.textContent || '').trim().length > 0);
-      if (visible) { obs.disconnect(); setTimeout(goToCheckout, 300); }
-    });
-    obs.observe(host, { childList: true, subtree: true, attributes: true });
+      if (visible && !redirectedRef.current) {
+        try { if (window.fbq) { window.fbq('track', 'Lead'); window.fbq('track', 'InitiateCheckout'); } } catch (e) {}
+        setTimeout(goToCheckout, 400);
+      }
+    }
 
-    // dispara o envio do AC
-    const btn = form.querySelector('button[type="submit"], input[type="submit"], ._submit');
-    if (btn) btn.click();
-    else if (form.requestSubmit) form.requestSubmit();
-    else form.submit();
+    const obs = new MutationObserver(checkSuccess);
+    obs.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
+    observerRef.current = obs;
+    // primeira passada (caso o form já exista)
+    beautify();
+    const t = setInterval(beautify, 600);
+    return () => { obs.disconnect(); observerRef.current = null; clearInterval(t); };
+  }, []);
 
-    // rede de segurança: se o "obrigado" não for detectado, segue ao checkout
-    setTimeout(goToCheckout, 3500);
-    return true;
-  }
-
-  function onSubmit(e) {
-    e.preventDefault();
-    if (sending) return;
-    if (!validate()) return;
-    setSending(true);
-    try { if (window.fbq) { window.fbq('track', 'Lead'); window.fbq('track', 'InitiateCheckout'); } } catch (err) {}
-    const ok = submitViaAC();
-    if (!ok) setTimeout(goToCheckout, 400); // fallback se o form do AC não tiver carregado
-  }
-
-  function setField(k, v) { setValues(prev => ({ ...prev, [k]: v })); }
+  // ESC + trava scroll
+  React.useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+      const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+      window.addEventListener('keydown', onKey);
+      // re-embeleza ao abrir
+      setTimeout(() => {
+        const c = bodyRef.current;
+        if (!c) return;
+        const ev = new Event('stopbeautify');
+        c.dispatchEvent(ev);
+      }, 50);
+      return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', onKey); };
+    }
+  }, [open]);
 
   return (
-    <>
-      {/* Formulário REAL do AC — oculto, só para enviar */}
-      <div ref={acHostRef} aria-hidden="true" style={{ position: 'absolute', left: '-9999px', top: 0, width: '420px', height: '1px', overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
-        <div className="_form_15"></div>
-      </div>
-
-      <div className={`prereg-overlay ${open ? 'open' : ''}`} onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}>
-        <div className="prereg-modal" role="dialog" aria-modal="true">
-          <div className="prereg-head">
-            <button className="prereg-close" onClick={close} aria-label="Fechar">×</button>
-            <span className="badge">Pré-inscrição</span>
-            <h3>Garanta sua vaga no credenciamento STOP</h3>
-            <p>Preencha seus dados para continuar. Você será direcionado ao checkout em seguida.</p>
-          </div>
-          <div className="prereg-body">
-            <form onSubmit={onSubmit} noValidate>
-              <div className="prereg-field">
-                <label>Nome completo <span className="req">*</span></label>
-                <input type="text" value={values.name} onChange={(e) => setField('name', e.target.value)}
-                  className={errors.name ? 'invalid' : ''} placeholder="Seu nome completo" autoFocus />
-                <div className={`err ${errors.name ? 'show' : ''}`}>{errors.name}</div>
-              </div>
-              <div className="prereg-field">
-                <label>WhatsApp <span className="req">*</span></label>
-                <input type="tel" inputMode="numeric" value={values.phone}
-                  onChange={(e) => setField('phone', formatPhone(e.target.value))}
-                  className={errors.phone ? 'invalid' : ''} placeholder="(00) 00000-0000" />
-                <div className={`err ${errors.phone ? 'show' : ''}`}>{errors.phone}</div>
-              </div>
-              <div className="prereg-field">
-                <label>E-mail <span className="req">*</span></label>
-                <input type="email" value={values.email} onChange={(e) => setField('email', e.target.value)}
-                  className={errors.email ? 'invalid' : ''} placeholder="seu@email.com.br" />
-                <div className={`err ${errors.email ? 'show' : ''}`}>{errors.email}</div>
-              </div>
-              <button type="submit" className="prereg-submit" disabled={sending}>
-                {sending ? 'Enviando...' : 'Continuar para o checkout →'}
-              </button>
-              <div className="prereg-foot">
-                <Icon.Lock /> Seus dados estão seguros e não serão compartilhados.
-              </div>
-            </form>
-          </div>
+    <div className={`prereg-overlay ${open ? 'open' : ''}`} onMouseDown={(e) => { if (e.target === e.currentTarget) setOpen(false); }}>
+      <div className="prereg-modal" role="dialog" aria-modal="true">
+        <div className="prereg-head">
+          <button className="prereg-close" onClick={() => setOpen(false)} aria-label="Fechar">×</button>
+          <span className="badge">Pré-inscrição</span>
+          <h3>Garanta sua vaga no credenciamento STOP</h3>
+          <p>Preencha seus dados para continuar. Ao enviar, você será direcionado ao checkout.</p>
+        </div>
+        <div className="prereg-body" ref={bodyRef}>
+          {/* Formulário REAL do ActiveCampaign (form 15) — injetado e embelezado */}
+          <div className="_form_15"></div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
